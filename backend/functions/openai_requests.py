@@ -1,10 +1,13 @@
 from openai import OpenAI
 from decouple import config
+from dotenv import load_dotenv
+import json
+import os
+load_dotenv()
 
+api_key = os.getenv("OPENAI_API_KEY")
 
-OPENAI_API_KEY = config('OPENAI_API_KEY')
-
-client = OpenAI(api_key=OPENAI_API_KEY)
+client = OpenAI()
 
 
 #import custom functions
@@ -41,10 +44,15 @@ def get_chat_response(message_input):
             model='gpt-4',
             messages=messages
                                                   )
-        message = response.choices[0].message
+        message = response.choices[0].message.content
 
         return message
     except Exception as e:
         print(e)
-        return
+        pass
+    
+    
+    
+
+
 

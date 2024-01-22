@@ -7,9 +7,18 @@ from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from decouple import config
 import openai
+from dotenv import load_dotenv
+import os
 
 #custom function imports 
 from functions.openai_requests import convert_audio_to_text
+from functions.openai_requests import get_chat_response
+from functions.database import store_messages, reset_messages
+from functions.text_to_speech import convert_text_to_speech
+
+load_dotenv()
+
+api_key = os.getenv("OPENAI_API_KEY")
 # initialize app
 app = FastAPI()
 
@@ -36,6 +45,11 @@ app.add_middleware(
 async def check_health():
     return {'message': 'healthy'}
 
+@app.get('/reset')
+async def reset_conversation():
+    reset_messages()
+    return {'message': 'conversation reset'}
+
 # # post bot response
 # # Note: Not playing in browser when using post request
 # @app.post('/post-audio')
@@ -50,6 +64,35 @@ async def get_audio():
 
     # decode audio
     message_decoded = convert_audio_to_text(audio_file)
-    print(message_decoded)
-    return 'done'
+    
+    # gurard: ensure message decoded
+    if not message_decoded:
+        return  HTTPException(status_code=400, detail='failed to decode audio')
+    
+    #get chat response
+    chat_response = get_chat_response(message_decoded)
+
+    #guard: ensure chat response
+
+    if not chat_response:
+        return HTTPException(status_code=400, detail='failed to get chat response')
+
+    store_messages(message_decoded, chat_response)
+    print(chat_response)
+
+    # convert chat response to audio
+    audio_output = convert_text_to_speech(chat_response)
+
+    # guard: ensure audio output
+    if not audio_output:
+        return HTTPException(status_code=400, detail='failed to get audio output')
+    
+    # create a generator that yields chunks of data
+    def iterfile():
+        yield audio_output
+
+
+    #return audiofile
+    return StreamingResponse(iterfile(), media_type='audio/mpeg')
+
 
