@@ -9,12 +9,13 @@ from decouple import config
 import openai
 from dotenv import load_dotenv
 import os
+from io import BytesIO
 
 #custom function imports 
 from functions.openai_requests import convert_audio_to_text
 from functions.openai_requests import get_chat_response
 from functions.database import store_messages, reset_messages
-from functions.text_to_speech import convert_text_to_speech
+from functions.text_to_speech import openai_convert_text_to_speech
 
 load_dotenv()
 
@@ -81,18 +82,36 @@ async def get_audio():
     print(chat_response)
 
     # convert chat response to audio
-    audio_output = convert_text_to_speech(chat_response)
+    audio_output_response = openai_convert_text_to_speech(chat_response)
+    
+    # convert HttpxBinaryResponseContent to bytes
+    audio_output = audio_output_response.read()
+
 
     # guard: ensure audio output
     if not audio_output:
         return HTTPException(status_code=400, detail='failed to get audio output')
     
-    # create a generator that yields chunks of data
-    def iterfile():
-        yield audio_output
+    print(audio_output)
+
+      # create a generator that yields chunks of data
+    def iterbytes():
+        buffer = BytesIO(audio_output)
+        yield from buffer
+
+    # return audio data as a streaming response
+    return StreamingResponse(iterbytes(), media_type='audio/mpeg')
+    
+    # # create a generator that yields chunks of data
+    # def iterfile():
+    #     yield audio_output
 
 
     #return audiofile
-    return StreamingResponse(iterfile(), media_type='audio/mpeg')
+    # return StreamingResponse(iterfile(), media_type='audio/mpeg')
+
+
+# TO DO:
+# implement open AI text to speech
 
 
